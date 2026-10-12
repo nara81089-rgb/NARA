@@ -1,0 +1,189 @@
+-- [[ ណារ៉ា script - AUTO EGG & 4 BUTTONS TOOLS ]] --
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+local autoStealEnabled = false
+local farmRadius = 1000
+local savedCFrame = nil
+
+-- មុខងារស្វែងរក Remote 
+local function findRemote(name)
+    for _, v in ipairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
+        if v.Name == name and (v:IsA("RemoteEvent") or v:IsA("UnreliableRemoteEvent")) then
+            return v
+        end
+    end
+    return nil
+end
+
+-- មុខងារស្វែងរកទីតាំងស៊ុតក្នុង Workspace
+local function getEggPosition()
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("Model") and (v.Name:lower():find("egg") or v:FindFirstChild("Hitbox") or v:FindFirstChild("PrimaryPart")) then
+            local part = v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart")
+            if part then
+                return part.CFrame
+            end
+        end
+    end
+    return nil
+end
+
+-- មុខងារឆែករកតម្លៃវត្ថុ
+local function isValidTarget(obj, part)
+   local parentModel = part.Parent
+   local textToCheck = string.lower(obj.Name .. " " .. part.Name .. " " .. (parentModel and parentModel.Name or ""))
+   if parentModel then
+      for _, descendant in ipairs(parentModel:GetDescendants()) do
+         if descendant:IsA("TextLabel") or descendant:IsA("TextBox") then
+            textToCheck = textToCheck .. " " .. string.lower(descendant.Text)
+         end
+      end
+   end
+   if string.find(textToCheck, "b") or string.find(textToCheck, "t") or string.find(textToCheck, "secret") or string.find(textToCheck, "godly") or string.find(textToCheck, "mythic") or string.find(textToCheck, "billion") or string.find(textToCheck, "trillion") then
+      return true
+   end
+   return false
+end
+
+-- Noclip & Auto Steal / Auto Egg Loop
+RunService.Stepped:Connect(function()
+   local char = LocalPlayer.Character
+   if char then
+      if autoStealEnabled or _G.AutoEgg then
+         for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+               part.CanCollide = false
+            end
+         end
+      end
+   end
+end)
+
+-- ដំណើរការ Auto Steal
+RunService.RenderStepped:Connect(function()
+   if autoStealEnabled then
+      pcall(function()
+         local char = LocalPlayer.Character
+         if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+         local root = char.HumanoidRootPart
+         for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") and obj.Parent and obj.Parent:IsA("BasePart") then
+               if (root.Position - obj.Parent.Position).Magnitude <= farmRadius and isValidTarget(obj, obj.Parent) then
+                  fireproximityprompt(obj)
+               end
+            end
+         end
+      end)
+   end
+end)
+
+-- ដំណើរការ Auto Egg Farm
+task.spawn(function()
+    while true do
+        if _G.AutoEgg then
+            pcall(function()
+                local eggCFrame = getEggPosition()
+                if eggCFrame and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    LocalPlayer.Character.HumanoidRootPart.CFrame = eggCFrame + Vector3.new(0, 3, 0)
+                end
+
+                local eggHitRequest = findRemote("EggHitRequest")
+                if eggHitRequest then
+                    eggHitRequest:FireServer()
+                end
+            end)
+        end
+        task.wait(0.2)
+    end
+end)
+
+local function safeTeleport()
+   if not savedCFrame then return end
+   local char = LocalPlayer.Character
+   if char and char:FindFirstChild("HumanoidRootPart") then
+      char.HumanoidRootPart.CFrame = savedCFrame + Vector3.new(0, 3, 0)
+   end
+end
+
+-- [[ បង្កើត ScreenGui សម្រាប់ប៊ូតុងទាំង ៥ ]] --
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "NaraToolsGui"
+screenGui.Parent = CoreGui
+screenGui.ResetOnSpawn = false
+screenGui.DisplayOrder = 2147483647
+
+local function createCircleButton(name, pos, col, text)
+   local btn = Instance.new("TextButton")
+   btn.Name = name
+   btn.Parent = screenGui
+   btn.BackgroundColor3 = col
+   btn.Position = pos
+   btn.Size = UDim2.new(0, 55, 0, 55)
+   btn.Font = Enum.Font.SourceSansBold
+   btn.Text = text
+   btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+   btn.TextScaled = true
+   btn.Active = true
+   btn.Draggable = true
+   local corner = Instance.new("UICorner")
+   corner.CornerRadius = UDim.new(1, 0)
+   corner.Parent = btn
+   return btn
+end
+
+-- ប៊ូតុងទី១: Auto Egg (បើក/បិទ វាយស៊ុតស្វ័យប្រវត្តិ)
+local eggBtn = createCircleButton("EggBtn", UDim2.new(0.30, 0, 0.05, 0), Color3.fromRGB(45, 45, 45), "Auto Egg:\nបិទ")
+eggBtn.MouseButton1Click:Connect(function()
+   _G.AutoEgg = not _G.AutoEgg
+   if _G.AutoEgg then
+      eggBtn.Text = "Auto Egg:\nបើក"
+      eggBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+   else
+      eggBtn.Text = "Auto Egg:\nបិទ"
+      eggBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+   end
+end)
+
+-- ប៊ូតុងទី២: តាមដាន (เปิด/ปิด Auto Steal)
+local followBtn = createCircleButton("FollowBtn", UDim2.new(0.37, 0, 0.05, 0), Color3.fromRGB(0, 150, 255), "តាមដាន:\nបិទ")
+followBtn.MouseButton1Click:Connect(function()
+   autoStealEnabled = not autoStealEnabled
+   if autoStealEnabled then
+      followBtn.Text = "តាមដាន:\nបើក"
+      followBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+   else
+      followBtn.Text = "តាមដាន:\nបិទ"
+      followBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+   end
+end)
+
+-- ប៊ូតុងទី៣: Save កន្លែង
+local saveBtn = createCircleButton("SaveBtn", UDim2.new(0.44, 0, 0.05, 0), Color3.fromRGB(0, 200, 100), "Save\nកន្លែង")
+saveBtn.MouseButton1Click:Connect(function()
+   local char = LocalPlayer.Character
+   if char and char:FindFirstChild("HumanoidRootPart") then
+      savedCFrame = char.HumanoidRootPart.CFrame
+   end
+end)
+
+-- ប៊ូតុងទី៤: TP មកវិញ
+local tpBtn = createCircleButton("TpBtn", UDim2.new(0.51, 0, 0.05, 0), Color3.fromRGB(255, 128, 0), "TP\nមកវិញ")
+tpBtn.MouseButton1Click:Connect(function()
+   safeTeleport()
+end)
+
+-- ប៊ូតុងទី៥: Steal
+local stealBtn = createCircleButton("StealBtn", UDim2.new(0.58, 0, 0.05, 0), Color3.fromRGB(150, 0, 255), "Steal:\nបិទ")
+stealBtn.MouseButton1Click:Connect(function()
+   autoStealEnabled = not autoStealEnabled
+   if autoStealEnabled then
+      stealBtn.Text = "Steal:\nបើក"
+      stealBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+   else
+      stealBtn.Text = "Steal:\nបិទ"
+      stealBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 255)
+   end
+end)
